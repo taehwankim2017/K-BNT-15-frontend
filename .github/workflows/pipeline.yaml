@@ -1,0 +1,40 @@
+name: Deploy a static website to AWS S3 and CloudFront
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: AWS
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v2
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+        
+      - name: Deploy without HTML files to S3
+        run: |
+          aws s3 sync ./src/ s3://${{ secrets.AWS_S3_BUCKET }} \
+            --delete \
+            --exclude "*.html" \
+
+      - name: Deploy only HTML files to S3
+        run: |
+          aws s3 sync ./src/ s3://${{ secrets.AWS_S3_BUCKET }} \
+            --include "*.html" \
+            --cache-control "no-cache,no-store,must-revalidate"
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
